@@ -5,12 +5,13 @@ import {
   calculateLongestStreak,
 } from "../utils/habitStats";
 import Tooltip from "./Tooltip";
+import { useRef } from "react";
 
-function HabitGrid({ habits, toggleHabit }) {
+function HabitGrid({ habits, toggleHabit, isAnyDragging }) {
   const today = new Date().toISOString().split("T")[0];
+
   const days = useMemo(() => {
     const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
     const now = new Date();
     const start = new Date(now);
 
@@ -40,6 +41,7 @@ function HabitGrid({ habits, toggleHabit }) {
 
     return total;
   }
+
   function getWeekLabel(days) {
     const start = new Date(days[0].date);
     const end = new Date(days[6].date);
@@ -77,65 +79,108 @@ function HabitGrid({ habits, toggleHabit }) {
       </div>
 
       {/* HABIT ROW */}
-
-      {habits.map((habit) => {
-        const progress = getWeeklyProgress(habit);
-        const percent = Math.round((progress / 7) * 100);
-        const streak = calculateCurrentStreak(habit.history);
-        const bestStreak = calculateLongestStreak(habit.history);
-        const color = habit.color || "#22c55e";
-        return (
-          <div key={habit.id} className="grid-row">
-            <div className="grid-habit-name">
-              <span className="habit-title" style={{ color: color }}>
-                {habit.name}
-              </span>
-              <div className="habit-stats">
-                <span className="streak">🔥 {streak}</span>
-                <span className="best-streak">🏆 {bestStreak}</span>
-              </div>
-            </div>
-
-            {days.map((day) => {
-              const checked = habit.history?.[day.date] || false;
-              const isFuture = day.date > today;
-              const isToday = day.date === today;
-
-              return (
-                <div
-                  key={day.date}
-                  className={`grid-cell 
-                    ${checked ? "checked" : ""}
-                    ${isFuture ? "future" : ""}
-                    ${isToday ? "today" : ""}
-                  `}
-                  style={{ background: checked ? color : undefined }}
-                  onClick={() => {
-                    if (isFuture) return;
-
-                    toggleHabit(day.date, habit.id);
-                  }}
-                />
-              );
-            })}
-
-            {/* PROGRESS */}
-
-            <div className="grid-progress">
-              <div className="progress-bar">
-                <div
-                  className="progress-fill"
-                  style={{ width: `${percent}%`, background: color }}
-                />
-              </div>
-
-              <span className="progress-text">{progress}/7</span>
-            </div>
-          </div>
-        );
-      })}
+      {habits.map((habit) => (
+        <HabitGridRow
+          key={habit.id}
+          habit={habit}
+          days={days}
+          today={today}
+          toggleHabit={toggleHabit}
+          isAnyDragging={isAnyDragging}
+          getWeeklyProgress={getWeeklyProgress}
+        />
+      ))}
     </div>
   );
 }
 
 export default HabitGrid;
+
+/* ====================================================== */
+/* ================= GRID ROW ============================ */
+/* ====================================================== */
+
+function HabitGridRow({
+  habit,
+  days,
+  today,
+  toggleHabit,
+  isAnyDragging,
+  getWeeklyProgress,
+}) {
+  const titleRef = useRef(null);
+
+  const progress = getWeeklyProgress(habit);
+  const percent = Math.round((progress / 7) * 100);
+  const streak = calculateCurrentStreak(habit.history);
+  const bestStreak = calculateLongestStreak(habit.history);
+  const color = habit.color || "#22c55e";
+
+  return (
+    <Tooltip
+      anchorRef={titleRef}
+      content={
+        <>
+          <strong>{habit.name}</strong>
+          {habit.note && (
+            <>
+              <br />
+              <span>{habit.note}</span>
+            </>
+          )}
+        </>
+      }
+      disabled={isAnyDragging || !habit.name}
+      delay={300}
+    >
+      <div className="grid-row">
+        {/* NAME */}
+        <div className="grid-habit-name">
+          <span className="habit-title" ref={titleRef}>
+            {habit.name}
+          </span>
+
+          <div className="habit-stats">
+            <span className="streak">🔥 {streak}</span>
+            <span className="best-streak">🏆 {bestStreak}</span>
+          </div>
+        </div>
+
+        {/* CELLS */}
+        {days.map((day) => {
+          const checked = habit.history?.[day.date] || false;
+          const isFuture = day.date > today;
+          const isToday = day.date === today;
+
+          return (
+            <div
+              key={day.date}
+              className={`grid-cell 
+                ${checked ? "checked" : ""}
+                ${isFuture ? "future" : ""}
+                ${isToday ? "today" : ""}
+              `}
+              style={{ background: checked ? color : undefined }}
+              onClick={() => {
+                if (isFuture) return;
+                toggleHabit(day.date, habit.id);
+              }}
+            />
+          );
+        })}
+
+        {/* PROGRESS */}
+        <div className="grid-progress">
+          <div className="progress-bar">
+            <div
+              className="progress-fill"
+              style={{ width: `${percent}%`, background: color }}
+            />
+          </div>
+
+          <span className="progress-text">{progress}/7</span>
+        </div>
+      </div>
+    </Tooltip>
+  );
+}

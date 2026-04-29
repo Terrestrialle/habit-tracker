@@ -6,7 +6,7 @@
   --bg-card: #111827;
   --bg-soft: #1f2937;
   --border: #374151;
-  --text-main: #f9fafb;
+  --text-main: #d9dadb;
   --text-dim: #9ca3af;
   --accent: #22c55e;
 }
@@ -68,7 +68,8 @@ body {
   border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  height: 575px;
+  height: fit-content;
+  max-height: 575px;
   overflow: auto;
 }
 .habit-list {
@@ -239,7 +240,8 @@ body {
   padding: 10px 0 20px 0;
   flex-direction: column;
   gap: 6px;
-  height: 575px;
+  height: fit-content;
+  max-height: 575px;
 }
 .grid-header {
   border-bottom: 1px solid var(--border);
@@ -253,27 +255,31 @@ body {
   align-items: center;
   column-gap: 12px;
 }
-.habit-title {
-  font-weight: 500;
-}
 .grid-habit-name {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding-right: 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
   gap: 8px;
   font-size: 14px;
   font-weight: 500;
   min-width: 0;
-  max-width: 200px;
+  max-width: 250px;
   white-space: nowrap;
   overflow: hidden;
+  transition: all 0.15s ease;
 }
 .grid-habit-name span {
   min-width: 0;
   max-width: 100px;
   text-overflow: ellipsis;
   overflow: hidden;
+}
+.habit-title {
+  font-weight: 500;
+  color: var(--text-main);
 }
 .habit-note {
   font-size: 12px;
@@ -331,6 +337,9 @@ body {
 }
 .best-streak {
   opacity: 0.7;
+  width: 40px;
+  border-radius: 6px;
+  background: rgba(174, 57, 194, 0.15);
 }
 .grid-col {
   display: flex;
@@ -539,32 +548,39 @@ body {
 /* TOOLTIP */
 .tooltip-wrapper {
   position: relative;
-  display: inline-block;
 }
 .tooltip-box {
-  position: absolute;
-  bottom: 120%;
-  left: 0;
-  background: #020617;
-  border: 1px solid var(--border);
+  background: rgba(10, 10, 25, 0.9);
+  color: #fff;
   padding: 8px 10px;
   border-radius: 6px;
   font-size: 12px;
-  line-height: 1.4;
-  max-width: 300px;
-  white-space: normal;
-  color: var(--text-main);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-  animation: tooltipFade 0.12s ease;
-  z-index: 200;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 9999;
 }
-.tooltip-box::after {
-  content: "";
-  position: absolute;
-  left: 12px;
-  top: 100%;
-  border: 6px solid transparent;
-  border-top-color: #020617;
+.stats-panel {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  font-size: 12px;
+  margin-top: 16px;
+}
+.stats-panel div {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+.stats-panel div:hover {
+  background: #0f172a;
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.stat-val {
+  font-weight: 600;
+  color: var(--accent);
 }
 @media (max-width: 1100px) {
   .container {
@@ -584,12 +600,29 @@ body {
   }
   .grid-header,
   .grid-row {
-    grid-template-columns: 150px repeat(7, 26px) 70px;
+    grid-template-columns: minmax(150px, 1fr) repeat(7, 25px) minmax(
+        70px,
+        100px
+      );
+    column-gap: 12px;
+    width: 100%;
+  }
+  .grid-row {
+    transition: background 0.15s ease;
+  }
+  .grid-row:hover {
+    background: rgba(10, 10, 25, 0.9);
   }
   .grid-cell,
   .grid-col {
     width: 26px;
     height: 26px;
+  }
+  .grid-habit-name {
+    max-width: 350px;
+  }
+  .grid-habit-name span.habit-title {
+    max-width: 200px;
   }
   .progress-bar {
     width: 50px;

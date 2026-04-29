@@ -153,10 +153,10 @@ function App() {
         <HabitGrid habits={habits} toggleHabit={toggleHabit} />
       </div>
       <div className="stats-panel">
-        <div>Total Habits: {stats.totalHabits}</div>
-        <div>Completed Today: {stats.todayCompleted}</div>
-        <div>Completion Rate: {stats.completionRate}%</div>
-        <div>Consistency Score: {consistency}%</div>
+        <div>Total Habits: <span className="stat-val">{stats.totalHabits}</span></div>
+        <div>Completed Today: <span className="stat-val">{stats.todayCompleted}</span></div>
+        <div>Completion Rate: <span className="stat-val">{stats.completionRate}%</span></div>
+        <div>Consistency Score: <span className="stat-val">{consistency}%</span></div>
       </div>
       <HabitHeatmap habits={habits} />
 

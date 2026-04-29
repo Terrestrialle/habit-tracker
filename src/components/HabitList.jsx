@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import sanitizeInput from "../utils/sanitizeInput";
 import Tooltip from "./Tooltip";
-
+import { createPortal } from "react-dom";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 
 import {
@@ -26,6 +26,7 @@ function HabitList({
   const [newHabitNote, setNewHabitNote] = useState("");
 
   const [menuOpen, setMenuOpen] = useState(null);
+  const [menuPos, setMenuPos] = useState(null);
 
   const [editingId, setEditingId] = useState(null);
   const [editingValue, setEditingValue] = useState("");
@@ -33,9 +34,11 @@ function HabitList({
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editingNoteValue, setEditingNoteValue] = useState("");
 
+  const [isAnyDragging, setIsAnyDragging] = useState(false);
+
   const formRef = useRef(null);
 
-  /* ---------- CANCEL CREATE HABIT ---------- */
+  /* ---------- GLOBAL EVENTS ---------- */
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -43,27 +46,64 @@ function HabitList({
         setCreating(false);
       }
     }
+
     function closeMenu(e) {
-      if (!e.target.closest(".habit-actions")) {
+      if (!e.target.closest(".habit-menu") && !e.target.closest(".menu-btn")) {
         setMenuOpen(null);
+        setMenuPos(null);
       }
     }
+
     function handleEsc(e) {
       if (e.key === "Escape") {
         setCreating(false);
+        setMenuOpen(null);
       }
     }
 
     document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEsc);
     document.addEventListener("mousedown", closeMenu);
+    document.addEventListener("keydown", handleEsc);
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("mousedown", closeMenu);
       document.removeEventListener("keydown", handleEsc);
-      document.addEventListener("mousedown", closeMenu);
     };
   }, []);
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const updatePosition = () => {
+      const btn = document.querySelector(`[data-menu-id="${menuOpen}"]`);
+      if (!btn) return;
+
+      const rect = btn.getBoundingClientRect();
+
+      const menuWidth = 160;
+      const padding = 8;
+
+      const x = Math.min(rect.right, window.innerWidth - menuWidth - padding);
+
+      setMenuPos({
+        x,
+        y: rect.bottom,
+      });
+    };
+
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [menuOpen]);
+  /* ---------- RESET MENU POSITION ---------- */
+
+  // useEffect(() => {
+  //   if (!menuOpen) setMenuPos(null);
+  // }, [menuOpen]);
 
   /* ---------- CREATE HABIT ---------- */
 
@@ -123,7 +163,19 @@ function HabitList({
         </div>
       )}
 
-      <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <DndContext
+        collisionDetection={closestCenter}
+        onDragStart={() => {
+          setIsAnyDragging(true);
+          setMenuOpen(null);
+          setMenuPos(null);
+        }}
+        onDragEnd={(event) => {
+          setIsAnyDragging(false);
+          handleDragEnd(event);
+        }}
+        onDragCancel={() => setIsAnyDragging(false)}
+      >
         <SortableContext
           items={habits.map((h) => h.id)}
           strategy={verticalListSortingStrategy}
@@ -135,6 +187,8 @@ function HabitList({
               index={index}
               menuOpen={menuOpen}
               setMenuOpen={setMenuOpen}
+              menuPos={menuPos}
+              setMenuPos={setMenuPos}
               editingId={editingId}
               editingValue={editingValue}
               setEditingId={setEditingId}
@@ -147,6 +201,7 @@ function HabitList({
               deleteHabit={deleteHabit}
               updateHabitNote={updateHabitNote}
               updateHabitColor={updateHabitColor}
+              isAnyDragging={isAnyDragging}
             />
           ))}
         </SortableContext>
@@ -166,6 +221,8 @@ function SortableHabit({
   index,
   menuOpen,
   setMenuOpen,
+  menuPos,
+  setMenuPos,
   editingId,
   editingValue,
   setEditingId,
@@ -178,6 +235,7 @@ function SortableHabit({
   deleteHabit,
   updateHabitColor,
   updateHabitNote,
+  isAnyDragging,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: habit.id });
@@ -186,8 +244,6 @@ function SortableHabit({
     transform: CSS.Transform.toString(transform),
     transition,
   };
-
-  /* ---------- RENAME ---------- */
 
   const startRename = () => {
     setEditingId(habit.id);
@@ -202,142 +258,160 @@ function SortableHabit({
     setEditingId(null);
   };
 
-  /* ---------- SAVE NOTE ---------- */
-
   const saveNote = () => {
     const clean = sanitizeInput(editingNoteValue);
-
     updateHabitNote(habit.id, clean);
-
     setEditingNoteId(null);
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="habit-list-row">
-      {/* DRAG */}
+    <Tooltip
+      content={
+        <>
+          <strong>{habit.name}</strong>
+          {habit.note && (
+            <>
+              <br />
+              <span>{habit.note}</span>
+            </>
+          )}
+        </>
+      }
+      disabled={
+        isAnyDragging || editingId === habit.id || editingNoteId === habit.id
+      }
+      delay={300}
+    >
+      <div ref={setNodeRef} style={style} className="habit-list-row">
+        <span className="drag-handle" {...attributes} {...listeners}>
+          ⋮⋮
+        </span>
 
-      <span className="drag-handle" {...attributes} {...listeners}>
-        ⋮⋮
-      </span>
+        <span className="habit-number">{index + 1}</span>
 
-      {/* NUMBER */}
-
-      <span className="habit-number">{index + 1}</span>
-
-      {/* MAIN */}
-
-      <div className="habit-main">
-        {editingId === habit.id ? (
-          <input
-            className="rename-input"
-            autoFocus
-            value={editingValue}
-            onChange={(e) => setEditingValue(e.target.value)}
-            onBlur={saveRename}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") saveRename();
-              if (e.key === "Escape") setEditingId(null);
-            }}
-          />
-        ) : (
-          <Tooltip
-            content={
-              <>
-                <strong>{habit.name}</strong>
-                {habit.note && (
-                  <>
-                    <br />
-                    <span>{habit.note}</span>
-                  </>
-                )}
-              </>
-            }
-          >
+        <div className="habit-main">
+          {editingId === habit.id ? (
+            <input
+              className="rename-input"
+              autoFocus
+              value={editingValue}
+              onChange={(e) => setEditingValue(e.target.value)}
+              onBlur={saveRename}
+            />
+          ) : (
             <span className="habit-name" onDoubleClick={startRename}>
               {habit.name}
             </span>
-          </Tooltip>
-        )}
+          )}
 
-        {editingNoteId === habit.id ? (
-          <textarea
-            className="habit-note-edit"
-            autoFocus
-            maxLength={200}
-            value={editingNoteValue}
-            onChange={(e) => setEditingNoteValue(e.target.value)}
-            onBlur={saveNote}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") saveNote();
-              if (e.key === "Escape") setEditingId(null);
+          {editingNoteId === habit.id ? (
+            <textarea
+              className="habit-note-edit"
+              autoFocus
+              value={editingNoteValue}
+              onChange={(e) => setEditingNoteValue(e.target.value)}
+              onBlur={saveNote}
+            />
+          ) : (
+            habit.note && <div className="habit-note">{habit.note}</div>
+          )}
+        </div>
+
+        {/* MENU */}
+        <div className="habit-actions">
+          <button
+            className="menu-btn"
+            data-menu-id={habit.id}
+            onClick={(e) => {
+              e.stopPropagation();
+
+              if (menuOpen === habit.id) {
+                setMenuOpen(null);
+                return;
+              }
+
+              const rect = e.currentTarget.getBoundingClientRect();
+
+              const menuWidth = 160;
+              const padding = 8;
+
+              const x = Math.min(
+                rect.right,
+                window.innerWidth - menuWidth - padding,
+              );
+
+              setMenuPos({
+                x,
+                y: rect.bottom,
+              });
+
+              setMenuOpen(habit.id);
             }}
-          />
-        ) : (
-          habit.note && <div className="habit-note">{habit.note}</div>
-        )}
-      </div>
+          >
+            ⋯
+          </button>
 
-      {/* MENU */}
+          {menuOpen === habit.id &&
+            menuPos &&
+            createPortal(
+              <div
+                className="habit-menu"
+                style={{
+                  position: "fixed",
+                  left: menuPos.x,
+                  top: menuPos.y + 6,
+                  zIndex: 9999,
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="habit-color-picker">
+                  {[
+                    "#22c55e",
+                    "#3b82f6",
+                    "#a855f7",
+                    "#f59e0b",
+                    "#ef4444",
+                    "#06b6d4",
+                  ].map((color) => (
+                    <span
+                      key={color}
+                      className="color-dot"
+                      style={{ backgroundColor: color }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        updateHabitColor(habit.id, color);
+                        setMenuOpen(null);
+                      }}
+                    />
+                  ))}
+                </div>
 
-      <div className="habit-actions">
-        <button
-          className="menu-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            setMenuOpen(menuOpen === habit.id ? null : habit.id);
-          }}
-        >
-          ⋯
-        </button>
-
-        {menuOpen === habit.id && (
-          <div className="habit-menu">
-            <div className="habit-color-picker">
-              {[
-                "#22c55e",
-                "#3b82f6",
-                "#a855f7",
-                "#f59e0b",
-                "#ef4444",
-                "#06b6d4",
-              ].map((color) => (
-                <span
-                  key={color}
-                  className="color-dot"
-                  style={{ backgroundColor: color }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    updateHabitColor(habit.id, color);
+                <button
+                  onClick={() => {
+                    setEditingId(habit.id);
+                    setEditingValue(habit.name);
                     setMenuOpen(null);
                   }}
-                />
-              ))}
-            </div>
+                >
+                  Rename
+                </button>
 
-            <button
-              onClick={() => {
-                setEditingId(habit.id);
-                setEditingValue(habit.name);
-                setMenuOpen(null);
-              }}
-            >
-              Rename
-            </button>
+                <button
+                  onClick={() => {
+                    setEditingNoteId(habit.id);
+                    setEditingNoteValue(habit.note || "");
+                    setMenuOpen(null);
+                  }}
+                >
+                  Edit Note
+                </button>
 
-            <button
-              onClick={() => {
-                setEditingNoteId(habit.id);
-                setEditingNoteValue(habit.note || "");
-                setMenuOpen(null);
-              }}
-            >
-              Edit Note
-            </button>
-
-            <button onClick={() => deleteHabit(habit.id)}>Delete</button>
-          </div>
-        )}
+                <button onClick={() => deleteHabit(habit.id)}>Delete</button>
+              </div>,
+              document.body,
+            )}
+        </div>
       </div>
-    </div>
+    </Tooltip>
   );
 }
